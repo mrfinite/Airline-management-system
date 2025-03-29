@@ -28,21 +28,16 @@ public class Dashboard extends JFrame {
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
 
-        // Get user ID
         userId = getUserId(email);
 
-        // Main panel with tab layout
         JTabbedPane tabbedPane = new JTabbedPane();
 
-        // Bookings Tab
         JPanel bookingsPanel = createBookingsPanel();
         tabbedPane.addTab("My Bookings", bookingsPanel);
 
-        // Book New Flight Tab
         JPanel bookFlightPanel = createBookFlightPanel();
         tabbedPane.addTab("Book New Flight", bookFlightPanel);
 
-        // Cancel Booking Tab
         JPanel cancelBookingPanel = createCancelBookingPanel();
         tabbedPane.addTab("Cancel Booking", cancelBookingPanel);
 
@@ -70,13 +65,11 @@ public class Dashboard extends JFrame {
     private JPanel createBookingsPanel() {
         JPanel panel = new JPanel(new BorderLayout());
         
-        // Table model setup
         String[] columnNames = {"Booking ID", "Flight Number", "Source", "Destination", 
                                 "Departure", "Passengers", "Total Price", "Status"};
         bookingsModel = new DefaultTableModel(columnNames, 0);
         bookingsTable = new JTable(bookingsModel);
         
-        // Populate bookings
         populateBookings();
 
         JScrollPane scrollPane = new JScrollPane(bookingsTable);
@@ -86,7 +79,7 @@ public class Dashboard extends JFrame {
     }
 
     private void populateBookings() {
-        bookingsModel.setRowCount(0); // Clear existing rows
+        bookingsModel.setRowCount(0); 
         
         try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASS)) {
             String sql = "SELECT b.booking_id, f.flight_number, f.source, f.destination, " +
@@ -123,13 +116,11 @@ public class Dashboard extends JFrame {
     private JPanel createBookFlightPanel() {
         JPanel panel = new JPanel(new BorderLayout());
         
-        // Table to show available flights
         String[] columnNames = {"Flight Number", "Airline", "Source", "Destination", 
                                 "Departure", "Available Seats", "Price"};
         DefaultTableModel flightsModel = new DefaultTableModel(columnNames, 0);
         JTable flightsTable = new JTable(flightsModel);
         
-        // Populate available flights
         try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASS)) {
             String sql = "SELECT flight_number, airline, source, destination, " +
                          "departure_datetime, available_seats, base_price " +
@@ -159,7 +150,6 @@ public class Dashboard extends JFrame {
         JScrollPane scrollPane = new JScrollPane(flightsTable);
         panel.add(scrollPane, BorderLayout.CENTER);
 
-        // Book Flight Button
         JButton bookButton = new JButton("Book Selected Flight");
         bookButton.addActionListener(e -> {
             int selectedRow = flightsTable.getSelectedRow();
@@ -168,8 +158,6 @@ public class Dashboard extends JFrame {
                 return;
             }
 
-            // Here you would implement the booking logic
-            // For now, just showing a placeholder
             String flightNumber = (String) flightsModel.getValueAt(selectedRow, 0);
             bookFlight(flightNumber);
         });
@@ -181,10 +169,8 @@ public class Dashboard extends JFrame {
 
     private void bookFlight(String flightNumber) {
         try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASS)) {
-            // Start transaction
             conn.setAutoCommit(false);
 
-            // Get flight details
             String flightSql = "SELECT flight_id, available_seats, base_price FROM Flights WHERE flight_number = ?";
             PreparedStatement flightStmt = conn.prepareStatement(flightSql);
             flightStmt.setString(1, flightNumber);
@@ -200,14 +186,12 @@ public class Dashboard extends JFrame {
             int availableSeats = flightRs.getInt("available_seats");
             double basePrice = flightRs.getDouble("base_price");
 
-            // Check if seats are available
             if (availableSeats < 1) {
                 JOptionPane.showMessageDialog(this, "No seats available");
                 conn.rollback();
                 return;
             }
 
-            // Insert booking
             String bookingSql = "INSERT INTO Bookings (user_id, flight_id, num_passengers, total_price, status) " +
                                 "VALUES (?, ?, 1, ?, 'CONFIRMED')";
             PreparedStatement bookingStmt = conn.prepareStatement(bookingSql);
@@ -216,16 +200,13 @@ public class Dashboard extends JFrame {
             bookingStmt.setDouble(3, basePrice);
             bookingStmt.executeUpdate();
 
-            // Update available seats
             String updateSeatsSql = "UPDATE Flights SET available_seats = available_seats - 1 WHERE flight_id = ?";
             PreparedStatement updateSeatsStmt = conn.prepareStatement(updateSeatsSql);
             updateSeatsStmt.setInt(1, flightId);
             updateSeatsStmt.executeUpdate();
 
-            // Commit transaction
             conn.commit();
 
-            // Refresh bookings and flights
             populateBookings();
             JOptionPane.showMessageDialog(this, "Flight booked successfully!");
 
@@ -238,13 +219,11 @@ public class Dashboard extends JFrame {
     private JPanel createCancelBookingPanel() {
         JPanel panel = new JPanel(new BorderLayout());
         
-        // Table to show user's bookings for cancellation
         String[] columnNames = {"Booking ID", "Flight Number", "Source", "Destination", 
                                 "Departure", "Passengers", "Total Price", "Status"};
         DefaultTableModel cancelModel = new DefaultTableModel(columnNames, 0);
         JTable cancelTable = new JTable(cancelModel);
         
-        // Populate bookings for cancellation
         try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASS)) {
             String sql = "SELECT b.booking_id, f.flight_number, f.source, f.destination, " +
                          "f.departure_datetime, b.num_passengers, b.total_price, b.status " +
@@ -279,7 +258,6 @@ public class Dashboard extends JFrame {
         JScrollPane scrollPane = new JScrollPane(cancelTable);
         panel.add(scrollPane, BorderLayout.CENTER);
 
-        // Cancel Booking Button
         JButton cancelButton = new JButton("Cancel Selected Booking");
         cancelButton.addActionListener(e -> {
             int selectedRow = cancelTable.getSelectedRow();
@@ -299,10 +277,8 @@ public class Dashboard extends JFrame {
 
     private void cancelBooking(int bookingId) {
         try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASS)) {
-            // Start transaction
             conn.setAutoCommit(false);
 
-            // Get booking details
             String bookingSql = "SELECT flight_id, num_passengers FROM Bookings WHERE booking_id = ?";
             PreparedStatement bookingStmt = conn.prepareStatement(bookingSql);
             bookingStmt.setInt(1, bookingId);
@@ -317,23 +293,19 @@ public class Dashboard extends JFrame {
             int flightId = bookingRs.getInt("flight_id");
             int numPassengers = bookingRs.getInt("num_passengers");
 
-            // Update booking status
             String updateBookingSql = "UPDATE Bookings SET status = 'CANCELLED' WHERE booking_id = ?";
             PreparedStatement updateBookingStmt = conn.prepareStatement(updateBookingSql);
             updateBookingStmt.setInt(1, bookingId);
             updateBookingStmt.executeUpdate();
 
-            // Update available seats
             String updateSeatsSql = "UPDATE Flights SET available_seats = available_seats + ? WHERE flight_id = ?";
             PreparedStatement updateSeatsStmt = conn.prepareStatement(updateSeatsSql);
             updateSeatsStmt.setInt(1, numPassengers);
             updateSeatsStmt.setInt(2, flightId);
             updateSeatsStmt.executeUpdate();
 
-            // Commit transaction
             conn.commit();
 
-            // Refresh bookings
             populateBookings();
             JOptionPane.showMessageDialog(this, "Booking cancelled successfully!");
 

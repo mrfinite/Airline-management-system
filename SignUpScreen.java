@@ -95,21 +95,18 @@ public class SignUpScreen extends JFrame {
                 String phone = phoneField.getText().trim();
                 String password = new String(passwordField.getPassword());
 
-                // Enhanced input validation
                 if (name.isEmpty() || email.isEmpty() || phone.isEmpty() || password.isEmpty()) {
                     messageLabel.setForeground(Color.RED);
                     messageLabel.setText("All fields are required!");
                     return;
                 }
 
-                // Basic email validation
                 if (!isValidEmail(email)) {
                     messageLabel.setForeground(Color.RED);
                     messageLabel.setText("Invalid email format!");
                     return;
                 }
 
-                // Basic phone validation (simple numeric check)
                 if (!isValidPhone(phone)) {
                     messageLabel.setForeground(Color.RED);
                     messageLabel.setText("Invalid phone number!");
@@ -120,13 +117,11 @@ public class SignUpScreen extends JFrame {
                     messageLabel.setForeground(Color.GREEN);
                     messageLabel.setText("Registration Successful!");
                     
-                    // Clear fields after successful registration
                     nameField.setText("");
                     emailField.setText("");
                     phoneField.setText("");
                     passwordField.setText("");
 
-                    // Automatically open login screen
                     new LoginScreen();
                     dispose();
                 } else {
@@ -142,31 +137,27 @@ public class SignUpScreen extends JFrame {
         setVisible(true);
     }
 
-    // Email validation method
     private static boolean isValidEmail(String email) {
         String emailRegex = "^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$";
         return email.matches(emailRegex);
     }
 
-    // Phone validation method (basic numeric check)
     private static boolean isValidPhone(String phone) {
-        return phone.matches("\\d{10}"); // Assumes 10-digit phone number
+        return phone.matches("\\d{10}"); 
     }
 
     private static boolean registerUser(String name, String email, String phone, String password) {
         try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASS)) {
-            // Check if email already exists
             String checkEmail = "SELECT COUNT(*) FROM Users WHERE email = ?";
             try (PreparedStatement checkStmt = conn.prepareStatement(checkEmail)) {
                 checkStmt.setString(1, email);
                 try (ResultSet rs = checkStmt.executeQuery()) {
                     if (rs.next() && rs.getInt(1) > 0) {
-                        return false; // Email already exists
+                        return false; 
                     }
                 }
             }
 
-            // Insert new user
             String sql = "INSERT INTO Users (full_name, email, phone, password) VALUES (?, ?, ?, ?)";
             try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
                 pstmt.setString(1, name);

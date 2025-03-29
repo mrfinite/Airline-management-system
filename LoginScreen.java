@@ -109,7 +109,7 @@ public class LoginScreen extends JFrame {
                 pstmt.setString(1, email);
                 pstmt.setString(2, password);
                 try (ResultSet rs = pstmt.executeQuery()) {
-                    return rs.next(); // Returns true if a matching user is found
+                    return rs.next(); 
                 }
             }
         } catch (SQLException e) {
