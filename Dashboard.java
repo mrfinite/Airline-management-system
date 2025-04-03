@@ -75,6 +75,10 @@ public class Dashboard extends JFrame {
         JScrollPane scrollPane = new JScrollPane(bookingsTable);
         panel.add(scrollPane, BorderLayout.CENTER);
 
+        JButton refreshButton = new JButton("Refresh Bookings");
+        refreshButton.addActionListener(e -> populateBookings());
+        panel.add(refreshButton, BorderLayout.SOUTH);
+
         return panel;
     }
 
@@ -150,7 +154,20 @@ public class Dashboard extends JFrame {
         JScrollPane scrollPane = new JScrollPane(flightsTable);
         panel.add(scrollPane, BorderLayout.CENTER);
 
+        JPanel bookingControlsPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 10));
+        
+        JLabel ticketsLabel = new JLabel("Number of Tickets:");
+        SpinnerNumberModel ticketsModel = new SpinnerNumberModel(1, 1, 10, 1);
+        JSpinner ticketsSpinner = new JSpinner(ticketsModel);
+        
         JButton bookButton = new JButton("Book Selected Flight");
+        
+        bookingControlsPanel.add(ticketsLabel);
+        bookingControlsPanel.add(ticketsSpinner);
+        bookingControlsPanel.add(bookButton);
+        
+        panel.add(bookingControlsPanel, BorderLayout.SOUTH);
+
         bookButton.addActionListener(e -> {
             int selectedRow = flightsTable.getSelectedRow();
             if (selectedRow == -1) {
@@ -159,15 +176,23 @@ public class Dashboard extends JFrame {
             }
 
             String flightNumber = (String) flightsModel.getValueAt(selectedRow, 0);
-            bookFlight(flightNumber);
+            int numTickets = (int) ticketsSpinner.getValue();
+            
+            int availableSeats = (int) flightsModel.getValueAt(selectedRow, 5);
+            if (numTickets > availableSeats) {
+                JOptionPane.showMessageDialog(this, 
+                    "Not enough seats available. Only " + availableSeats + " seats left.",
+                    "Booking Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+            
+            bookFlight(flightNumber, numTickets);
         });
-
-        panel.add(bookButton, BorderLayout.SOUTH);
 
         return panel;
     }
 
-    private void bookFlight(String flightNumber) {
+    private void bookFlight(String flightNumber, int numTickets) {
         try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASS)) {
             conn.setAutoCommit(false);
 
@@ -186,29 +211,36 @@ public class Dashboard extends JFrame {
             int availableSeats = flightRs.getInt("available_seats");
             double basePrice = flightRs.getDouble("base_price");
 
-            if (availableSeats < 1) {
-                JOptionPane.showMessageDialog(this, "No seats available");
+            if (availableSeats < numTickets) {
+                JOptionPane.showMessageDialog(this, 
+                    "Not enough seats available. Only " + availableSeats + " seats left.",
+                    "Booking Error", JOptionPane.ERROR_MESSAGE);
                 conn.rollback();
                 return;
             }
 
+            double totalPrice = basePrice * numTickets;
+
             String bookingSql = "INSERT INTO Bookings (user_id, flight_id, num_passengers, total_price, status) " +
-                                "VALUES (?, ?, 1, ?, 'CONFIRMED')";
+                                "VALUES (?, ?, ?, ?, 'CONFIRMED')";
             PreparedStatement bookingStmt = conn.prepareStatement(bookingSql);
             bookingStmt.setInt(1, userId);
             bookingStmt.setInt(2, flightId);
-            bookingStmt.setDouble(3, basePrice);
+            bookingStmt.setInt(3, numTickets);
+            bookingStmt.setDouble(4, totalPrice);
             bookingStmt.executeUpdate();
 
-            String updateSeatsSql = "UPDATE Flights SET available_seats = available_seats - 1 WHERE flight_id = ?";
+            String updateSeatsSql = "UPDATE Flights SET available_seats = available_seats - ? WHERE flight_id = ?";
             PreparedStatement updateSeatsStmt = conn.prepareStatement(updateSeatsSql);
-            updateSeatsStmt.setInt(1, flightId);
+            updateSeatsStmt.setInt(1, numTickets);
+            updateSeatsStmt.setInt(2, flightId);
             updateSeatsStmt.executeUpdate();
 
             conn.commit();
 
             populateBookings();
-            JOptionPane.showMessageDialog(this, "Flight booked successfully!");
+            JOptionPane.showMessageDialog(this, 
+                "Successfully booked " + numTickets + " ticket(s) for flight " + flightNumber);
 
         } catch (SQLException ex) {
             ex.printStackTrace();
@@ -258,6 +290,8 @@ public class Dashboard extends JFrame {
         JScrollPane scrollPane = new JScrollPane(cancelTable);
         panel.add(scrollPane, BorderLayout.CENTER);
 
+        JPanel cancelControlsPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 10));
+        
         JButton cancelButton = new JButton("Cancel Selected Booking");
         cancelButton.addActionListener(e -> {
             int selectedRow = cancelTable.getSelectedRow();
@@ -268,9 +302,24 @@ public class Dashboard extends JFrame {
 
             int bookingId = (int) cancelModel.getValueAt(selectedRow, 0);
             cancelBooking(bookingId);
+            
+            panel.removeAll();
+            panel.add(createCancelBookingPanel());
+            panel.revalidate();
+            panel.repaint();
+        });
+        
+        JButton refreshButton = new JButton("Refresh List");
+        refreshButton.addActionListener(e -> {
+            panel.removeAll();
+            panel.add(createCancelBookingPanel());
+            panel.revalidate();
+            panel.repaint();
         });
 
-        panel.add(cancelButton, BorderLayout.SOUTH);
+        cancelControlsPanel.add(cancelButton);
+        cancelControlsPanel.add(refreshButton);
+        panel.add(cancelControlsPanel, BorderLayout.SOUTH);
 
         return panel;
     }
